@@ -1,4 +1,4 @@
-name: Build AmeOS (LineageOS Base)
+name: Build AmeOS (Prebuilt LineageOS)
 
 on:
   workflow_dispatch:
@@ -19,37 +19,28 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip \
-            curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 \
-            lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache \
-            libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 openjdk-11-jdk repo
+          sudo apt-get install -y unzip zip wget python3 openjdk-11-jdk adb
 
-      - name: Initialize LineageOS source
+      - name: Download prebuilt LineageOS emulator image
         run: |
-          mkdir -p $GITHUB_WORKSPACE/lineage
-          cd $GITHUB_WORKSPACE/lineage
-          repo init -u https://github.com/LineageOS/android.git -b lineage-22.2 --depth=1
-          repo sync -c -j8 --no-tags --no-clone-bundle
+          mkdir -p $GITHUB_WORKSPACE/lineage_prebuilt
+          cd $GITHUB_WORKSPACE/lineage_prebuilt
+          wget -O lineage-emulator.zip https://download.lineageos.org/emulator/x86_64/latest.zip
+          unzip lineage-emulator.zip
 
-      - name: Copy AmeOS vendor tree
+      - name: Apply AmeOS vendor tree and apps
         run: |
-          cp -r $GITHUB_WORKSPACE/ameos/vendor/ameos $GITHUB_WORKSPACE/lineage/vendor/
+          cp -r $GITHUB_WORKSPACE/ameos/vendor/ameos $GITHUB_WORKSPACE/lineage_prebuilt/vendor/
+          cp -r $GITHUB_WORKSPACE/ameos/apps/* $GITHUB_WORKSPACE/lineage_prebuilt/system/app/
+          cp -r $GITHUB_WORKSPACE/ameos/bootanimation/bootanimation.zip $GITHUB_WORKSPACE/lineage_prebuilt/system/media/
 
-      - name: Prepare build environment
+      - name: Package AmeOS ROM
         run: |
-          cd $GITHUB_WORKSPACE/lineage
-          source build/envsetup.sh
-          lunch lineage_gemini-userdebug  # emulator-friendly generic target
+          cd $GITHUB_WORKSPACE/lineage_prebuilt
+          zip -r AmeOS-Prebuilt.zip ./*
 
-      - name: Build LineageOS + AmeOS
-        run: |
-          cd $GITHUB_WORKSPACE/lineage
-          make bacon -j$(nproc)
-
-      - name: Upload ROM artifacts
+      - name: Upload AmeOS ROM
         uses: actions/upload-artifact@v4
         with:
-          name: AmeOS-Lineage-Build
-          path: |
-            $GITHUB_WORKSPACE/lineage/out/target/product/gemini/*.zip
-            $GITHUB_WORKSPACE/lineage/out/target/product/gemini/*.img
+          name: AmeOS-Prebuilt
+          path: $GITHUB_WORKSPACE/lineage_prebuilt/AmeOS-Prebuilt.zip
