@@ -1,7 +1,6 @@
-name: Build AmeOS (Prebuilt LineageOS)
+name: Build AmeOS with Prebuilt LineageOS
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
@@ -13,8 +12,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          path: ameos
 
       - name: Install dependencies
         run: |
@@ -25,22 +22,28 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/lineage_prebuilt
           cd $GITHUB_WORKSPACE/lineage_prebuilt
-          wget -O lineage-emulator.zip https://download.lineageos.org/emulator/x86_64/latest.zip
-          unzip lineage-emulator.zip
+          wget https://sourceforge.net/projects/lineageos-tv-x86/files/lineage-21.0/x86_64_tv_go/lineage-21.0-20250618-UNOFFICIAL-x86_64_tv_go-signed.iso/download -O lineageos.iso
 
-      - name: Apply AmeOS vendor tree and apps
+      - name: Mount ISO and extract contents
         run: |
-          cp -r $GITHUB_WORKSPACE/ameos/vendor/ameos $GITHUB_WORKSPACE/lineage_prebuilt/vendor/
-          cp -r $GITHUB_WORKSPACE/ameos/apps/* $GITHUB_WORKSPACE/lineage_prebuilt/system/app/
-          cp -r $GITHUB_WORKSPACE/ameos/bootanimation/bootanimation.zip $GITHUB_WORKSPACE/lineage_prebuilt/system/media/
+          mkdir -p $GITHUB_WORKSPACE/lineage_extracted
+          sudo mount -o loop $GITHUB_WORKSPACE/lineage_prebuilt/lineageos.iso /mnt
+          cp -r /mnt/* $GITHUB_WORKSPACE/lineage_extracted/
+          sudo umount /mnt
+
+      - name: Apply AmeOS customizations
+        run: |
+          cp -r $GITHUB_WORKSPACE/ameos/vendor/ameos $GITHUB_WORKSPACE/lineage_extracted/vendor/
+          cp -r $GITHUB_WORKSPACE/ameos/apps/* $GITHUB_WORKSPACE/lineage_extracted/system/app/
+          cp -r $GITHUB_WORKSPACE/ameos/bootanimation/bootanimation.zip $GITHUB_WORKSPACE/lineage_extracted/system/media/
 
       - name: Package AmeOS ROM
         run: |
-          cd $GITHUB_WORKSPACE/lineage_prebuilt
+          cd $GITHUB_WORKSPACE/lineage_extracted
           zip -r AmeOS-Prebuilt.zip ./*
 
       - name: Upload AmeOS ROM
         uses: actions/upload-artifact@v4
         with:
           name: AmeOS-Prebuilt
-          path: $GITHUB_WORKSPACE/lineage_prebuilt/AmeOS-Prebuilt.zip
+          path: $GITHUB_WORKSPACE/lineage_extracted/AmeOS-Prebuilt.zip
